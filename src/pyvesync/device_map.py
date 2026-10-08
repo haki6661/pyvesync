@@ -1101,8 +1101,8 @@ air_fryer_modules: list[AirFryerMap] = [
         model_display='CAF-DC111S-AEU',
         model_name='Turbo Tower Pro Smart Air Fryer',
         setup_entry='CAF-DC111S-AEU',
-        temperature_range_c=(40, 230),
-        temperature_range_f=(100, 450),
+        temperature_range_c=(30, 230),
+        temperature_range_f=(85, 450),
     ),
     AirFryerMap(
         class_name='VeSyncAirFryer158',

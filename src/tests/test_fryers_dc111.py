@@ -7,7 +7,12 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from pyvesync.device_map import get_device_config
-from pyvesync.devices.vesynckitchen import VeSyncAirFryerDC111
+from pyvesync.devices.vesynckitchen import (
+    DC111_RECIPES,
+    DC111_SYNC_FINISH,
+    DC111_SYNC_MATCH,
+    VeSyncAirFryerDC111,
+)
 from pyvesync.models.vesync_models import ResponseDeviceDetailsModel
 from tests.call_json_fryers import (
     DEVICE_DETAILS,
@@ -157,7 +162,7 @@ def test_fahrenheit_unit(fryer) -> None:
         ({'chamber': 3, 'temperature': 180, 'minutes': 5}, 'chamber'),
         ({'chamber': 1, 'temperature': 180, 'minutes': 0}, 'minutes'),
         ({'chamber': 1, 'temperature': 400, 'minutes': 5}, 'temperature'),
-        ({'chamber': 1, 'temperature': 180, 'minutes': 5, 'mode': 'Roast'}, 'mode'),
+        ({'chamber': 1, 'temperature': 180, 'minutes': 5, 'mode': 'Steam'}, 'mode'),
     ],
 )
 def test_prepare_program_rejects_invalid(fryer, kwargs, error) -> None:
@@ -266,7 +271,7 @@ def test_prepare_both_chambers_sync_finish(
                     'minutes': 15,
                     'mode': 'AirFry',
                 },
-                sync_type=1,
+                sync_type=DC111_SYNC_FINISH,
             )
         )
 
@@ -276,7 +281,7 @@ def test_prepare_both_chambers_sync_finish(
     data = mocked.await_args.kwargs['data']
 
     assert method == 'startMultiCook'
-    assert data['syncType'] == 1
+    assert data['syncType'] == 2
     assert data['workChamber'] == 4
     assert len(data['cookConfigs']) == 2
 
@@ -312,7 +317,7 @@ def test_prepare_both_chambers_match(
             fryer.prepare_both_chambers(
                 chamber_1=matching,
                 chamber_2=matching,
-                sync_type=2,
+                sync_type=DC111_SYNC_MATCH,
             )
         )
 
@@ -320,9 +325,32 @@ def test_prepare_both_chambers_match(
 
     data = mocked.await_args.kwargs['data']
 
-    assert data['syncType'] == 2
+    assert data['syncType'] == 1
     assert data['workChamber'] == 4
     assert data['cookConfigs'][0]['cookTemp'] == 195
     assert data['cookConfigs'][1]['cookTemp'] == 195
     assert data['cookConfigs'][0]['cookSetTime'] == 600
     assert data['cookConfigs'][1]['cookSetTime'] == 600
+
+
+def test_dc111_recipes_read_from_device() -> None:
+    """Recipe IDs read from a CAF-DC111S-AEU while each mode ran."""
+    assert {mode: recipe[0] for mode, recipe in DC111_RECIPES.items()} == {
+        'AirFry': 14,
+        'Bake': 9,
+        'Grill': 20,
+        'Roast': 13,
+        'Reheat': 16,
+        'Dry': 21,
+        'Proof': 27,
+    }
+
+
+def test_prepare_proof_at_30_degrees(fryer) -> None:
+    """Proof runs at 30 degrees Celsius on the appliance."""
+    mocked = AsyncMock(return_value=bypass_response()[0])
+    with patch.object(VeSyncAirFryerDC111, 'call_bypassv2_api', new=mocked):
+        assert asyncio.run(fryer.prepare_program(1, 30, 60, 'Proof')) is True
+    config = mocked.await_args.kwargs['data']['cookConfigs'][0]
+    assert config['recipeId'] == 27
+    assert config['cookTemp'] == 30

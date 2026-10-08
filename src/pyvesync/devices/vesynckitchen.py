@@ -57,6 +57,12 @@ AIR_FRYER_NO_ACTIVE_PROGRAM = 11923000
 
 DC111_RECIPES: dict[str, tuple[int, str]] = {
     'AirFry': (14, 'Air Fry'),
+    'Bake': (9, 'Bake'),
+    'Grill': (20, 'Grill'),
+    'Roast': (13, 'Roast'),
+    'Reheat': (16, 'Reheat'),
+    'Dry': (21, 'Dry'),
+    'Proof': (27, 'Proof'),
 }
 """Turbo Tower Pro cooking modes as {mode: (recipeId, recipeName)}.
 
@@ -65,8 +71,13 @@ fryer's panel and read `mode`, `recipe_id` and `recipe_name` from `state.chamber
 """
 DC111_RECIPE_TYPE = 3
 DC111_BOTH_CHAMBERS = 4
-DC111_SYNC_FINISH = 1
-DC111_SYNC_MATCH = 2
+DC111_SYNC_MATCH = 1
+"""syncType of the Match key: both chambers run the same settings."""
+DC111_SYNC_FINISH = 2
+"""syncType of the Sync key: both chambers finish at the same time.
+
+Both values were read from a CAF-DC111S-AEU while each key was used on its panel.
+"""
 
 
 # Status refresh interval in seconds
@@ -719,7 +730,8 @@ class AirFryerDC111State(FryerState):
 
     Attributes:
         chambers (dict[int, FryerChamberState]): State of chambers 1 and 2.
-        sync_type (int): 0 single chamber, 1 synced finish, 2 matching settings.
+        sync_type (int): 0 single chamber, 1 Match (same settings),
+            2 Sync (finish at the same time).
         work_chamber (int): Chamber in use, 0 none, 1 or 2, 4 both.
         temp_unit (str): `celsius` or `fahrenheit`.
     """
@@ -963,8 +975,9 @@ class VeSyncAirFryerDC111(BypassV2Mixin, VeSyncFryer):
         Args:
             chamber_1 (dict): Program for chamber 1.
             chamber_2 (dict): Program for chamber 2.
-            sync_type (int): 1 synchronizes finishing times,
-                2 applies matching settings to both chambers.
+            sync_type (int): 2 (`DC111_SYNC_FINISH`, the Sync key) synchronizes
+                finishing times, 1 (`DC111_SYNC_MATCH`, the Match key) applies
+                matching settings to both chambers.
 
         Raises:
             ValueError: If an argument is out of range.
